@@ -42,3 +42,10 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+
+      - name: Trivy scan file upload to a directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: 
+          name: trivy-results
+          path: trivy-results.sarif
