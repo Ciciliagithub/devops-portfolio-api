@@ -6,9 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/ciciliagithub/notes-api
+  
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -22,21 +29,21 @@ jobs:
       - name: Restore
         run: dotnet restore
 
-      - name: Build
+      - name: Compile .NET
         run: dotnet build --no-restore -c Release
 
       - name: Test
         run: dotnet test --no-build -c Release
 
       - name: Build Docker image
-        run: docker build -t notes-api:${{ github.sha }} .
+        run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
 
       - name: Trivy scan on image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: latest
           scan-type: image
-          image-ref: notes-api:${{ github.sha }}
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
@@ -50,3 +57,15 @@ jobs:
         with: 
           name: trivy-results
           path: trivy-results.sarif
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image to GHCR
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        run: docker push ${{ env.IMAGE }}:${{ github.sha }}
