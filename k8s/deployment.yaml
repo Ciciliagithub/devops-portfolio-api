@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: notes-api
-        image: ghcr.io/ciciliagithub/notes-api:a74c914fc80d233955ef1b1b4d936963aaf9d24d
+        image: ghcr.io/ciciliagithub/notes-api:3ed92a994fa9db53c1c0ab658a6b5c54377528aa
         ports:
         - containerPort: 8080
         resources:
