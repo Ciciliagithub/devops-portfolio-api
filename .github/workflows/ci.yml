@@ -9,6 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/ciciliagithub/notes-api
+  matrix_language: C# #Would normally put this on line 77?
   
 jobs:
   build-and-test:
@@ -36,14 +37,14 @@ jobs:
         run: dotnet test --no-build -c Release
 
       - name: Build Docker image
-        run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
+        run: docker build -t ${{env.IMAGE}}:${{ github.sha }} .
 
       - name: Trivy scan on image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: latest
           scan-type: image
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          image-ref: ${{env.IMAGE}}:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
@@ -68,4 +69,21 @@ jobs:
 
       - name: Push image to GHCR
         if: github.event_name == 'push' && github.ref_name == 'main'
-        run: docker push ${{ env.IMAGE }}:${{ github.sha }}
+        run: docker push ${{env.IMAGE}}:${{ github.sha }}
+
+      - name: "CodeQL: Init"
+        inputs:
+          tools: #Just putting this in here for know purposes, would in the push remove this as I want the actual version
+          languages: csharp #Not yet using this as recommended ${{matrix.language}} as I don't know how exactly it works
+          build-mode: none #I already built the source code, didn't I? So there's no reason to use autobuild otherwise redoing step, I thought maybe giving none and the argument of where it is but it can probs find it? but I can also just use manual and give it. for now using none
+          analysis-kinds:
+            default: code-scanning
+            default: code-quality
+            required: true
+        token:
+          ${{secrets.GITHUB_TOKEN}}
+        outputs:
+          codeql-path:
+          codeql-version:
+        runs:
+          using: node24 #even needed since I used ubuntyu earlier?

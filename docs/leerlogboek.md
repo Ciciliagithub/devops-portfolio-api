@@ -122,3 +122,57 @@ Geleerd: Hiernaast begreep ik alles al, endspoints waren geen moeite.
 - **`action.yml` verward met mijn workflow:** `inputs:`, `outputs:` en `runs:` uit de menukaart van de
   actie gekopieerd. Les: in mijn workflow alleen `uses:` + `with:`.
 - CodeQL eerst per ongeluk op **default setup** gezet (geen bestand in de repo), daarna advanced.
+
+
+## 16-11-2026 – Kubernetes lokaal met kind (dag 4)
+
+### Wat heb ik gedaan
+- Eerst de theorie: wat Kubernetes is, de architectuur (control plane + worker nodes)
+  en wat er stap voor stap gebeurt bij `kubectl apply`. Alles vastgelegd in een glossary.
+- kind geïnstalleerd en een lokaal cluster `notes` aangemaakt (1 node: `notes-control-plane`).
+- `k8s/deployment.yaml` geschreven: 2 replicas van `ghcr.io/ciciliagithub/notes-api:<commit-SHA>`,
+  poort 8080, liveness- en readiness-probe op `/health`, resource requests en limits.
+- `k8s/services.yaml` geschreven: Service van het type ClusterIP, selector `app: notes-api`,
+  port en targetPort 8080.
+- Toegepast met `kubectl apply` en gecontroleerd met `get pods`, `get endpoints`,
+  en via `port-forward` → `/health` gaf `{"status":"healthy"}`.
+- **Self-healing**: een pod verwijderd → de ReplicaSet maakte meteen een nieuwe pod
+  (nieuwe naam, nieuw IP), en de Service nam het nieuwe IP vanzelf op in de endpoints.
+- **Rolling update** naar een andere SHA: eerst een nieuwe pod ready, pas dan een oude weg →
+  geen downtime. Er ontstond een nieuwe ReplicaSet; de oude bleef bestaan met 0 pods.
+- **Rollback** met `kubectl rollout undo`, en `rollout status` / `rollout history` bekeken.
+
+### Wat heb ik geleerd
+- Kubernetes werkt met een **desired state**: ik beschrijf in YAML wat ik wil,
+  controllers lossen het verschil met de werkelijkheid op (reconciliation loop).
+- Alle componenten praten via de **API server**; self-healing is dezelfde keten als `apply`,
+  alleen begint die bij de ReplicaSet-controller.
+- Een podnaam bestaat uit: Deployment-naam – hash van de pod-template (ReplicaSet) – willekeurig deel.
+  Verandert de template (bijvoorbeeld het image), dan komt er een nieuwe ReplicaSet.
+- **Readiness** bepaalt of een pod verkeer krijgt (en in de endpoints staat);
+  **liveness** bepaalt of de container herstart wordt. Zonder readiness probe kan een rolling update
+  verkeer sturen naar een app die nog niet klaar is.
+- Waarom ik een **commit-SHA** als tag gebruik en geen `latest`: traceerbaar (welke commit, CI-run
+  en Trivy-scan), een rollback is mogelijk, en Kubernetes ziet een wijziging alleen als de tag verandert.
+- `rollout undo` gaat naar de **vorige** revisie (twee keer undo = heen en terug),
+  en een rollback krijgt een nieuw revisienummer.
+- **Drift**: `undo` past alleen het cluster aan, niet mijn YAML in Git. Bij de volgende `apply`
+  wordt de rollback ongedaan gemaakt. Dit is het probleem dat GitOps (Argo CD) oplost.
+- `port-forward` naar een Service gaat naar één pod; het test dus geen load balancing.
+
+### Fouten die ik maakte
+- **Indentation**: mijn probes stonden op het niveau van de pod in plaats van de container.
+  In YAML is de indentation de structuur.
+- **Readiness probe vergeten** in de eerste versie.
+- **`targetPort: 9376` overgenomen uit het voorbeeld** in de docs, terwijl mijn app op 8080 luistert.
+- **Verkeerde selector**: eerst `src/NotesApi`, daarna `apps:` in plaats van `app:`.
+  Dit is een stille fout: `apply` slaagt, maar de Service vindt 0 pods (endpoints `<none>`).
+- **`type: ClusterIP` bovenaan gezet** in plaats van onder `spec`.
+  Ezelsbruggetje: bovenaan staan alleen `apiVersion`, `kind`, `metadata`, `spec`.
+- `kubectl apply -f deployment.yaml` vanuit de root → bestand niet gevonden (het staat in `k8s/`).
+- Per ongeluk twee keer `rollout undo` gedaan → zo geleerd dat undo heen en weer gaat.
+
+### Volgende stap
+- Bespreken in het gesprek: "CI bouwt, scant en pusht het image; deployen naar Kubernetes doe ik
+  nu met de hand. De volgende stap is Argo CD, zodat Git de bron van waarheid wordt."
+- Later: Helm, Argo CD, en dezelfde manifests naar AKS via Terraform.
