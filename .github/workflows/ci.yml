@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -34,6 +33,16 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build -c Release
+
+  docker-scantools-ghcr:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
 
       - name: Build Docker image
         run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
