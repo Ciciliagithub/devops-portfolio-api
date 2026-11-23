@@ -5,7 +5,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app: notess-api
+    app: notes-api
   ports:
     - protocol: TCP
       port: 8080
